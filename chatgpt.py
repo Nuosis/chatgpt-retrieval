@@ -4,7 +4,7 @@ import sys
 import openai
 from langchain.chains import ConversationalRetrievalChain, RetrievalQA
 from langchain.chat_models import ChatOpenAI
-from langchain.document_loaders import DirectoryLoader, TextLoader
+from langchain.document_loaders import DirectoryLoader, TextLoader, UnstructuredXMLLoader
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.indexes import VectorstoreIndexCreator
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
@@ -12,6 +12,9 @@ from langchain.llms import OpenAI
 from langchain.vectorstores import Chroma
 
 import constants
+import glob
+
+xml_files = glob.glob('data/*.xml')
 
 os.environ["OPENAI_API_KEY"] = constants.APIKEY
 
@@ -28,7 +31,8 @@ if PERSIST and os.path.exists("persist"):
   index = VectorStoreIndexWrapper(vectorstore=vectorstore)
 else:
   #loader = TextLoader("data/data.txt") # Use this line if you only need data.txt
-  loader = DirectoryLoader("data/")
+  #loader = DirectoryLoader("data/")
+  loader = UnstructuredXMLLoader(xml_files)
   if PERSIST:
     index = VectorstoreIndexCreator(vectorstore_kwargs={"persist_directory":"persist"}).from_loaders([loader])
   else:
@@ -46,6 +50,11 @@ while True:
   if query in ['quit', 'q', 'exit']:
     sys.exit()
   result = chain({"question": query, "chat_history": chat_history})
+
+  if result['answer'] == 'I don\'t know':  # or whatever the script returns when it doesn't know the answer
+    # Fallback to ChatGPT-only
+    result = ChatOpenAI(model="gpt-3.5-turbo").ask(query)  # Replace this with actual API call
+
   print(result['answer'])
 
   chat_history.append((query, result['answer']))
